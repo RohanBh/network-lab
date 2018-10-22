@@ -14,12 +14,12 @@
 using namespace std;
 
 bool parse(string URL, string &remote, int &port, string &file) {
-  regex urlRegex("(\\w+://)?[a-z]+\\.(\\w+\\.)+[a-zA-Z]+(:\\d+)?(/[\\w\\$\\-_\\!~\\+]+)*/\\w+\\.\\w+");
+  regex urlRegex("(\\w+://)?([a-z]+\\.)?(\\w+\\.)+[a-zA-Z]+(:\\d+)?(/[\\d\\w\\$\\-_\\!~\\+]+)+\\.\\w+");
   if (!regex_match(URL, urlRegex)) {
     cout << "Bad URL: " << URL << "\n";
     return false;
   }
-  regex hostnameRegex("[a-z]+\\.(\\w+\\.)+[a-zA-Z]+");
+  regex hostnameRegex("([a-z]+\\.)?(\\w+\\.)+[a-zA-Z]+");
   smatch matcher;
   regex_search(URL, matcher, hostnameRegex);
   remote = matcher.str(0);
@@ -29,7 +29,7 @@ bool parse(string URL, string &remote, int &port, string &file) {
   if (!matcher.str(0).empty()) {
     port = stoi((matcher.str(0).c_str()) + 1);
   }
-  regex fileRegex("((/[\\w\\$\\-_!~\\+]+)*/\\w+\\.\\w+)$");
+  regex fileRegex("((/[\\d\\w\\$\\-_!~\\+]+)+\\.\\w+)$");
   regex_search(URL, matcher, fileRegex);
   file = matcher.str(0);
   return true;
@@ -151,7 +151,9 @@ int main(int argc, char **argv) {
   }
 
   // Use CRLF line ending: https://stackoverflow.com/a/5757349
-  string message = "GET " + file + " HTTP/1.0\r\n\r\n";
+  // Mention Host in request header -
+  // https://www.howtogeek.com/254097/how-do-web-servers-know-if-you-are-using-direct-ip-address-access-or-not/
+  string message = "GET " + file + " HTTP/1.0\r\n" + "Host: " + host + "\r\n\r\n";
   time_t seconds; // represents the current time
   time(&seconds);
   string tmpfile = ".cache/tmp" + to_string(seconds);
@@ -193,13 +195,17 @@ int main(int argc, char **argv) {
       outfile << buffer;
     }
   }
+  close(s);
+  outfile.close();
+  if (mimeType == "text/html") {
+    rename(tmpfile.c_str(), string(tmpfile + ".html").c_str());
+    tmpfile += ".html";
+  }
   cache.insert(pair <string, pss > (URL, pss(tmpfile, mimeType)));
   writeCache(cache);
   cout << "\b\bRequest Successful!!!\n" << "\nMime Type: " << mimeType << "\nOpening Default application...\n\n";
-  close(s);
-  outfile.close();
   if (!openFile(tmpfile, mimeType)) {
-    cout << "Error opening file " << tmpfile;
+    cout << "Error opening file " << tmpfile << "\n";
   }
   return -1;
 }
