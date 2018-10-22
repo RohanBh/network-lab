@@ -161,7 +161,6 @@ int main(int argc, char **argv) {
   bool mimeflag = false;
   bool contentflag = false;
   regex mimeRegex("Content\\-Type: .+?(;|\\r\\n)");
-  regex contentRegex("\\r\\n\\r\\n[^]*");
   cmatch matcher;
   string mimeType;
   
@@ -169,7 +168,6 @@ int main(int argc, char **argv) {
   send(s , message.c_str() , strlen(message.c_str()), 0);
   while (n > 0) {
     n = recv(s, buffer, 1024, 0);
-    buffer[n] = '\0';
     if (!mimeflag) {
       regex_search(buffer, matcher, mimeRegex);
       string str = matcher.str(0);
@@ -184,15 +182,14 @@ int main(int argc, char **argv) {
       }
     }
     if (!contentflag) {
-      regex_search(buffer, matcher, contentRegex);
-      string str = matcher.str(0);
-      if (!str.empty()) {
-	str = str.substr(4);
-	outfile << str;
+      char *str = strstr(buffer, "\r\n\r\n");
+      if (str != NULL) {
+	str = str + 4;
+	outfile.write(str, n - (str - buffer));
 	contentflag = true;
       }
     } else {
-      outfile << buffer;
+      outfile.write(buffer, n);
     }
   }
   close(s);
